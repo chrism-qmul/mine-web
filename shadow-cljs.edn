@@ -1,0 +1,15 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src/dev"
+  "src/main"
+  "src/test"]
+
+ :dependencies
+ [[cider/cider-nrepl "0.36.0"]
+[dev.weavejester/medley "1.7.0"]]
+
+ :dev-http {8080 "public"}
+ :builds
+ {:app
+	{:target :browser
+	:modules {:main {:init-fn minecraft-web.app/init}}}}}

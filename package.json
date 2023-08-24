@@ -1,0 +1,17 @@
+{
+  "name": "minecraft-web",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "shadow-cljs": "2.25.2"
+  },
+  "dependencies": {
+    "extend": "^3.0.2",
+    "voxel": "^0.5.0",
+    "voxel-engine": "^0.20.2",
+    "voxel-fly": "^0.1.2",
+    "voxel-highlight": "^0.0.10",
+    "voxel-player": "^0.1.0",
+    "voxel-walk": "^0.0.5"
+  }
+}
