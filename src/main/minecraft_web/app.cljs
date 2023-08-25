@@ -12,7 +12,7 @@
 (defn init []
   (println "Hello World"))
 
-(let [g (game/create-game)
+(let [g (game/create)
  container (.appendChild (util/$ "div#root") (util/createEl "div"))]
 (game/add-to-dom g container)
 (game/setup! g)

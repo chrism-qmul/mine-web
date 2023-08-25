@@ -14,7 +14,99 @@
 
 (def TEXTURE_PATH "https://cdn.jsdelivr.net/gh/snyxan/myWorld@main/textures/")
 
-(def MATERIAL_MAP [ "blocks/stone" "blocks/stone_granite" "blocks/stone_granite_smooth" "blocks/stone_diorite" "blocks/stone_diorite_smooth" "blocks/stone_andesite" "blocks/stone_andesite_smooth" ["blocks/grass_top" "blocks/dirt" "blocks/grass_side"] "blocks/dirt" "blocks/coarse_dirt" ["blocks/dirt_podzol_top" "blocks/dirt_podzol_side"] "blocks/cobblestone" "blocks/planks_oak" "blocks/planks_spruce" "blocks/planks_birch" "blocks/planks_jungle" "blocks/planks_acacia" "blocks/planks_oak" "blocks/sapling_oak" "blocks/sapling_spruce" "blocks/sapling_birch" "blocks/sapling_jungle" "blocks/sapling_acacia" "blocks/sapling_oak" "blocks/bedrock" "blocks/water_still" "blocks/water_flow" "blocks/sand" "blocks/red_sand" "blocks/gravel" ["blocks/log_oak_top" "blocks/log_oak"] ["blocks/log_spruce_top" "blocks/log_spruce"] ["blocks/log_birch_top" "blocks/log_birch"] ["blocks/log_jungle_top" "blocks/log_jungle"] "blocks/leaves_oak" "blocks/leaves_spruce" "blocks/leaves_birch" "blocks/leaves_jungle" [ "blocks/sandstone_top" "blocks/sandstone_bottom" "blocks/sandstone_normal" ] "blocks/sandstone_smooth"  "blocks/sandstone_smooth" "blocks/deadbush" ["blocks/grass_top" "blocks/grass_side"] "blocks/fern" "blocks/deadbush" "blocks/wool_colored_white" "blocks/wool_colored_orange" "blocks/wool_colored_magenta" "blocks/wool_colored_light_blue" "blocks/wool_colored_yellow" "blocks/wool_colored_lime" "blocks/wool_colored_pink" "blocks/wool_colored_gray" "blocks/wool_colored_silver" "blocks/wool_colored_cyan" "blocks/wool_colored_purple" "blocks/wool_colored_blue" "blocks/wool_colored_brown" "blocks/wool_colored_green" "blocks/wool_colored_red" "blocks/wool_colored_black" "blocks/flower_dandelion" "blocks/flower_tulip_red" "blocks/mushroom_brown" "blocks/mushroom_red" "blocks/hardened_clay_stained_lime" "letter_r" "n_n" "o_n" "r_n" "t_n" "h_n" "s_s" "o_s" "u_s" "t_s" "h_s" "e_e" "a_e" "s_e" "t_e" "w_w" "e_w" "s_w" "t_w" "wireframed_blue" "wireframed_yellow" "wireframed_green" "wireframed_orange" "wireframed_purple" "wireframed_red" ])
+(def MATERIAL_MAP [ 
+"blocks/stone" 
+"blocks/stone_granite" 
+"blocks/stone_granite_smooth" 
+"blocks/stone_diorite" 
+"blocks/stone_diorite_smooth" 
+"blocks/stone_andesite" 
+"blocks/stone_andesite_smooth" 
+["blocks/grass_top" "blocks/dirt" "blocks/grass_side"] 
+"blocks/dirt" 
+"blocks/coarse_dirt" 
+["blocks/dirt_podzol_top" "blocks/dirt_podzol_side"] 
+"blocks/cobblestone" 
+"blocks/planks_oak" 
+"blocks/planks_spruce" 
+"blocks/planks_birch" 
+"blocks/planks_jungle" 
+"blocks/planks_acacia" 
+"blocks/planks_oak" 
+"blocks/sapling_oak" 
+"blocks/sapling_spruce" 
+"blocks/sapling_birch" 
+"blocks/sapling_jungle" 
+"blocks/sapling_acacia" 
+"blocks/sapling_oak" 
+"blocks/bedrock" 
+"blocks/water_still" 
+"blocks/water_flow" 
+"blocks/sand" 
+"blocks/red_sand" 
+"blocks/gravel" 
+["blocks/log_oak_top" "blocks/log_oak"] 
+["blocks/log_spruce_top" "blocks/log_spruce"] 
+["blocks/log_birch_top" "blocks/log_birch"] 
+["blocks/log_jungle_top" "blocks/log_jungle"] 
+"blocks/leaves_oak" 
+"blocks/leaves_spruce" 
+"blocks/leaves_birch" 
+"blocks/leaves_jungle" 
+[ "blocks/sandstone_top" "blocks/sandstone_bottom" "blocks/sandstone_normal" ] 
+"blocks/sandstone_smooth"  
+"blocks/sandstone_smooth" 
+"blocks/deadbush" 
+["blocks/grass_top" "blocks/grass_side"] 
+"blocks/fern" 
+"blocks/deadbush" 
+"blocks/wool_colored_white" 
+"blocks/wool_colored_orange" 
+"blocks/wool_colored_magenta" 
+"blocks/wool_colored_light_blue" 
+"blocks/wool_colored_yellow" 
+"blocks/wool_colored_lime" 
+"blocks/wool_colored_pink"
+"blocks/wool_colored_gray"
+"blocks/wool_colored_silver"
+"blocks/wool_colored_cyan"
+"blocks/wool_colored_purple"
+"blocks/wool_colored_blue"
+"blocks/wool_colored_brown"
+"blocks/wool_colored_green"
+"blocks/wool_colored_red"
+"blocks/wool_colored_black"
+"blocks/flower_dandelion"
+"blocks/flower_tulip_red"
+"blocks/mushroom_brown"
+"blocks/mushroom_red"
+"blocks/hardened_clay_stained_lime"
+"letter_r"
+"n_n"
+"o_n"
+"r_n"
+"t_n"
+"h_n"
+"s_s"
+"o_s"
+"u_s"
+"t_s"
+"h_s"
+"e_e"
+"a_e"
+"s_e"
+"t_e"
+"w_w"
+"e_w"
+"s_w"
+"t_w"
+"wireframed_blue"
+"wireframed_yellow"
+"wireframed_green"
+"wireframed_orange"
+"wireframed_purple"
+"wireframed_red"
+])
 
 (def SPEAKER_SKIN_PATH (str TEXTURE_PATH "agent.png"))
 
@@ -49,16 +141,18 @@
 5 90
 6 91})
 
+(defn inside-floor? [[x _ z]] 
+	(and (<= -5 x 5) (<= -5 z 5)))
 
 (defn generate-basic-map [x y z] 
   (let [map-coord (get map-coords [x y z])
 	too-high? (>= y 63)
-	inside-floor? (and (<= -5 x 5) (<= -5 z 5))
+	outside-floor? (not (inside-floor? [x y z]))
 	is-even? (even? (+ x z))]
 	(cond 
 	  too-high? 0
 	  (some? map-coord) map-coord
-	  (not inside-floor?) 53
+	  outside-floor? 53
 	  is-even? 46
 	  :else 54)))
 
@@ -74,9 +168,9 @@
  :controls {:discreteFire true}
  :texturePath TEXTURE_PATH})
 
-(defn create-game 
+(defn create
 	([opts] (voxel-engine. (clj->js (merge default-opts opts))))
-	([] (create-game {})))
+	([] (create {})))
 
 (defn get-target [game]
 	(.. game -controls target))
@@ -103,14 +197,20 @@
 		     (.startWalking voxel-walk)
 		     (.stopWalking voxel-walk))))))
 
-(defn add-block-at-pointer! [game block-type] 
-	(.createAdjacent game (.raycastVoxels game) block-type))
-
-(defn remove-block! [game position]
-	(.setBlock game position 0))
-
 (defn is-scenery? [[x y z]]
 	(< y 63))
+
+(defn remove-block! [game position]
+    (when-not (is-scenery? position)
+	(.setBlock game position 0)))
+
+(defn add-block! [game position block-type]
+    (when (inside-floor? position)
+        (.createBlock game position block-type)))
+
+(defn add-block-at-pointer! [game block-type] 
+    (let [position (.-adjacent (.raycastVoxels game))]
+        (add-block! game position block-type)))
 
 (defn add-to-dom [game el]
 	(.appendTo game el))
@@ -124,12 +224,10 @@
 		(add-block-at-pointer! game block-type))))
  (.on game "fire" (fn [target state] 
 		   (let [position (.-position (.raycastVoxels game))]
-		    (when-not (is-scenery? position)
-		     (remove-block! game position))))))
+		     (remove-block! game position)))))
 
 (defn setup! [game]
  (setup-highlight! game)
  (setup-interaction! game)
  (setup-player! game)
  (setup-player-walking-animation! game))
-	
