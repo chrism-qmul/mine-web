@@ -77,64 +77,79 @@
 
 ;(.remove container)
 
-(defn on-keypress [keycode-map]
-	(let [key-handler (KeyHandler. js/window)
-      	      press-fn (fn [key-press]
-			(.log js/console key-press)
-		      (when-let [f (get keycode-map (.. key-press -keyCode))]
-					(f))
-)]
-	(gev/listen key-handler "key" press-fn)))
-(.addEventListener js/window "keypress" #(.log js/console %))
+;(defn on-keypress [element keycode-map]
+;	(let [key-handler (KeyHandler. element)
+;      	      press-fn (fn [key-press]
+;			(let [keycode (.. key-press -keyCode)]
+;			(.log js/console key-press keycode keycodes/TWO keycode-map)
+;		      (when-let [f (get keycode-map keycode)]
+;					(f))
+;))]
+;	(gev/listen key-handler "key" press-fn true)))
+;(.addEventListener js/window "keypress" #(.log js/console %))
+
+(defn on-keypress [listener]
+	(.addEventListener js/window "keydown" (fn [ev] (listener ev)) false))
 
 (defn create-game 
 	([opts] (voxel-engine. (clj->js (merge default-opts opts))))
-	([] (voxel-engine. {})))
+	([] (create-game {})))
+
+(defn get-target [game]
+	(.. game -controls target))
+
+(defn setup-highlight! [game]
+	(highlight game #js{:color 0xff0000}))
+
+(defn setup-player! [game]
+ (let [player ((voxel-player game) SPEAKER_SKIN_PATH)]
+  (.possess player)
+  ((.. player -yaw -position -set) 2 14 4)
+  (.set player.position 0 63 0)
+  (.toggle player)
+  (.startFlying ((voxel-fly game) (get-target game)))
+  (.control game player)))
+
+(defn setup-player-walking-animation! [game]
+ (.on game "tick" (fn []
+		   (let [target (get-target game)
+		    velocity (.. target -velocity length)
+		    is-moving? (< velocity 0.001)]
+		    (.render voxel-walk (.-playerSkin target))
+		    (if is-moving?
+		     (.startWalking voxel-walk)
+		     (.stopWalking voxel-walk))))))
+
+(defn add-block-at-pointer [game block-type] 
+	(.createAdjacent game (.raycastVoxels game) block-type))
+
+(def key->block-type {
+1 86
+2 87
+3 88
+4 89
+5 90
+6 91})
 
 (let [highlight-position (atom nil)
-game (voxel-engine. (clj->js default-opts))
-	highlighter (highlight game #js{:color 0xff0000})
+game (create-game)
  container (.appendChild ($ "div#root") (createEl "div"))
- player ((voxel-player game) SPEAKER_SKIN_PATH)
- add-block-at-pointer (fn [block-type] (.log js/console "adding block") (.createAdjacent game (.raycastVoxels game) block-type))
  target (.. game -controls target)]
-(on-keypress (m/map-kv-vals #(add-block-at-pointer %) {keycodes/NUM_ONE 86
-keycodes/NUM_TWO 87
-keycodes/NUM_THREE 88
-keycodes/NUM_FOUR 89
-keycodes/NUM_FIVE 90
-keycodes/NUM_SIX 91}))
-(.on highlighter "highlight" #(reset! highlight-position %))
-	(.appendTo game container)
- (.possess player)
- ((.. player -yaw -position -set) 2 14 4)
- ;(.. player -yaw -position fromArray #js[2 14 4])
- (.set player.position 0 63 0);world-origin
- (.toggle player)
- (prn target)
- (.startFlying ((voxel-fly game) target))
- (.control game player)
- 
-(prn (.playerPosition game))
+;(on-keypress js/window (m/map-kv-vals (fn [keycode] #(add-block-at-pointer game keycode)) 
+(on-keypress (fn [ev] 
+	      (let [block-type (->> ev 
+				(.-key) 
+				(js/parseInt) 
+				(get key->block-type))] 
+			(add-block-at-pointer game block-type))))
+(setup-highlight! game)
+(.appendTo game container)
+(setup-player! game)
+(setup-player-walking-animation! game)
+;(prn (.playerPosition game))
 ;(.setInterval js/window (fn [] (prn (.playerPosition game))) 1000)
-(.on game "data" #(.log js/console %))
- (.on game "tick" (fn []
-	(let [velocity (.. target -velocity length)
-		is-moving? (< velocity 0.001)]
-	(.render voxel-walk (.-playerSkin target))
-	(if is-moving?
-		(.startWalking voxel-walk)
-		(.stopWalking voxel-walk))
-	)))
+;(.on game "data" #(.log js/console %))
 
-  (.on game "fire" (fn [target state] (when (some? @highlight-position) (.createBlock game @highlight-position 1))))
-   ; on keypress
+;  (.on game "fire" (fn [target state] (when (some? @highlight-position) (.createBlock game @highlight-position 1))))
   
  )
-;(do 
-;	(.possess player)
-	;(.. player -yaw -position set 2 14 4)
-	;(.. player -position set 0 63 0)
-	;(.. player toggle))
-;)
-
