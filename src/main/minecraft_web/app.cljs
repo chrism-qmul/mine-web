@@ -75,19 +75,6 @@
  :controls {:discreteFire true}
  :texturePath TEXTURE_PATH})
 
-;(.remove container)
-
-;(defn on-keypress [element keycode-map]
-;	(let [key-handler (KeyHandler. element)
-;      	      press-fn (fn [key-press]
-;			(let [keycode (.. key-press -keyCode)]
-;			(.log js/console key-press keycode keycodes/TWO keycode-map)
-;		      (when-let [f (get keycode-map keycode)]
-;					(f))
-;))]
-;	(gev/listen key-handler "key" press-fn true)))
-;(.addEventListener js/window "keypress" #(.log js/console %))
-
 (defn on-keypress [listener]
 	(.addEventListener js/window "keydown" (fn [ev] (listener ev)) false))
 
@@ -120,10 +107,10 @@
 		     (.startWalking voxel-walk)
 		     (.stopWalking voxel-walk))))))
 
-(defn add-block-at-pointer [game block-type] 
+(defn add-block-at-pointer! [game block-type] 
 	(.createAdjacent game (.raycastVoxels game) block-type))
 
-(def key->block-type {
+(def key-code->block-type {
 1 86
 2 87
 3 88
@@ -131,25 +118,35 @@
 5 90
 6 91})
 
+(defn is-scenery? [[x y z]]
+	(< y 63))
+
+(defn add-to-dom [game el]
+	(.appendTo game el))
+
+(defn setup-interaction! [game]
+ (on-keypress (fn [ev] 
+	       (when-let [block-type (->> ev 
+				      (.-key) 
+				      (js/parseInt) 
+				      (get key-code->block-type))] 
+		(add-block-at-pointer! game block-type))))
+ (.on game "fire" (fn [target state] 
+		   (let [position (.-position (.raycastVoxels game))]
+		    (when-not (is-scenery? position)
+		     (.setBlock game position 0))))))
+
 (let [highlight-position (atom nil)
 game (create-game)
- container (.appendChild ($ "div#root") (createEl "div"))
- target (.. game -controls target)]
-;(on-keypress js/window (m/map-kv-vals (fn [keycode] #(add-block-at-pointer game keycode)) 
-(on-keypress (fn [ev] 
-	      (let [block-type (->> ev 
-				(.-key) 
-				(js/parseInt) 
-				(get key->block-type))] 
-			(add-block-at-pointer game block-type))))
+ container (.appendChild ($ "div#root") (createEl "div"))]
+(add-to-dom game container)
 (setup-highlight! game)
-(.appendTo game container)
+(setup-interaction! game)
 (setup-player! game)
 (setup-player-walking-animation! game)
 ;(prn (.playerPosition game))
 ;(.setInterval js/window (fn [] (prn (.playerPosition game))) 1000)
 ;(.on game "data" #(.log js/console %))
-
 ;  (.on game "fire" (fn [target state] (when (some? @highlight-position) (.createBlock game @highlight-position 1))))
   
  )
