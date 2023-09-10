@@ -1,0 +1,31 @@
+version: '2' 
+
+services:
+  frontend:
+    build: ./frontend
+    #restart: unless-stopped
+    volumes:
+      - ./frontend/:/app
+    command: ["npx", "shadow-cljs", "watch", "app"]
+    ports:
+      - 9000:9000 #nrepl
+  server:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    volumes:
+      - ./server/:/app
+  http:
+    image: nginx
+    restart: unless-stopped
+    volumes:
+      - ./http/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/public/js/main.js:/app/main.js
+      - ./server/static:/app/static
+    ports:
+      - 8025:80
+    depends_on:
+      - server
+      - frontend

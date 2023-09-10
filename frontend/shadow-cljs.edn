@@ -1,0 +1,19 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src/dev"
+  "src/main"
+  "src/test"]
+
+ :dependencies
+ [[cider/cider-nrepl "0.36.0"]
+[dev.weavejester/medley "1.7.0"]
+[reagent "1.2.0"]]
+ :http {:host "0.0.0.0" :port 9630}
+ :dev-http {8080 {:root "public" :host "0.0.0.0"}}
+ :nrepl {:port 9000 :host "0.0.0.0"}
+ :builds
+ {:app
+	{
+:devtools {:devtools-url "http://localhost:8025/shadow-cljs"}
+:target :browser
+	:modules {:main {:init-fn minecraft-web.app/init}}}}}

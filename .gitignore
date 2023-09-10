@@ -1,5 +1,5 @@
-node_modules/
-public/js
+frontend/node_modules/
+frontend/public/js/
 
 /target
 /checkouts
@@ -18,3 +18,5 @@ pom.xml.asc
 
 .hgignore
 .hg/
+
+__pycache__

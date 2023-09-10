@@ -183,9 +183,45 @@
   (.possess player)
   ((.. player -yaw -position -set) 2 14 4)
   (.set player.position 0 63 0)
-  (.toggle player)
+  ;(.toggle player)
   (.startFlying ((voxel-fly game) (get-target game)))
   (.control game player)))
+
+(defn listen-world-change [game state]
+ (comment 
+(.on game "setBlock" (fn [pos new-val old-val]
+	(let [pos (js->clj pos)]
+	(if (zero? new-val)
+		;(do 
+		;(.log js/console "remove" (type (js->clj pos)) pos)
+		(swap! state dissoc pos)
+		;(do 
+		;(.log js/console "add" (type (js->clj pos)) pos)
+		(swap! state assoc pos new-val))
+;	(.log js/console "world change" @state ":" pos new-val old-val)
+)))
+)
+ (prn "adding state track")
+;(defonce logger (r/track! log-app-state))
+ (add-watch state :track 
+	(fn [_key _atom old-state new-state]
+		(let [for-removal (apply dissoc old-state (keys new-state))
+		      for-addition (apply dissoc new-state (keys old-state))]
+		;(.log js/console "old-state: " old-state "new-state: " new-state)
+		(.log js/console "for-removal: " (str for-removal) "for-addition: " (str for-addition))
+		
+		(doseq [[pos v] for-removal] (do (prn "removing" pos) (.setBlock game (clj->js pos) 0)))
+		(doseq [[pos v] for-addition] (do (prn "adding" pos v)(.setBlock game (clj->js pos) v)))
+		))))
+
+(defn apply-differences-to-game! [game old-state new-state]
+		(let [for-removal (apply dissoc old-state (keys new-state))
+		      for-addition (apply dissoc new-state (keys old-state))]
+		;(.log js/console "old-state: " old-state "new-state: " new-state)
+		(.log js/console "for-removal: " (str for-removal) "for-addition: " (str for-addition))
+		(doseq [[pos v] for-removal] (.setBlock game (clj->js pos) 0))
+		(doseq [[pos v] for-addition] (.setBlock game (clj->js pos) v))
+		))
 
 (defn setup-player-walking-animation! [game]
  (.on game "tick" (fn []
@@ -206,6 +242,7 @@
 
 (defn add-block! [game position block-type]
     (when (inside-floor? position)
+	(.log js/console position block-type)
         (.createBlock game position block-type)))
 
 (defn add-block-at-pointer! [game block-type] 
@@ -223,11 +260,14 @@
 				      (get key-code->block-type))] 
 		(add-block-at-pointer! game block-type))))
  (.on game "fire" (fn [target state] 
-		   (let [position (.-position (.raycastVoxels game))]
+		   (let [position (.-voxel (.raycastVoxels game))]
 		     (remove-block! game position)))))
 
-(defn setup! [game]
+(defn setup! [game state]
  (setup-highlight! game)
+ (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86))
  (setup-interaction! game)
  (setup-player! game)
- (setup-player-walking-animation! game))
+(listen-world-change game state)
+; (setup-player-walking-animation! game)
+)
