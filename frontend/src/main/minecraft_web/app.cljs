@@ -7,9 +7,21 @@
 	(:import [socket io-client])
 )
 
-;(def )
+(def key-code->block-type {
+1 "blue"; 86
+2 "yellow"; 87
+3 "green";88
+4 "orange";89
+5 "purple";90
+6 "red";91
+})
+   
 
 (def socket (io-client/io.))
+
+(def g (game/create))
+
+;(game/add-block! g [1 1 1] "blue")
 
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
@@ -22,30 +34,57 @@
 (def connected (atom false))
 (def game-obj (atom nil))
 (def game-state (atom nil))
+(def history (reagent/atom []))
 (def prev-utterances (reagent/atom []))
 
+(defn add-block-to-game! [g party position block-type]
+	(swap! history conj {:type :action :src party :data [position block-type "putdown"]})
+	(game/add-block! g position block-type))
 
-(defn encode-game-state []
-	(let [world-state (map (fn [[k v]] (vector k (- v 85))) @game-state)
-	      payload {:world-state world-state :dialog @prev-utterances}]
+(defn remove-block-from-game! [g party position]
+	(swap! history conj {:type :action :src party :data [position "pickup"]})
+	(game/remove-block! g position))
+
+(util/on-keypress (fn [ev] 
+	       (when-let [block-type (->> ev 
+				      (.-key) 
+				      (js/parseInt) 
+				      (get key-code->block-type))] 
+		(when-let [position (game/raycast-adjacent g)]
+		(add-block-to-game! g "Architect" position block-type)))))
+
+;(.. g -opts)
+;(.. g -opts -container)
+
+(defn is-utterance? [h]
+	(= :utterance (h :type)))
+
+(defn encoded-game-state []
+	(let [dialog (into [] (comp (filter is-utterance?) (map :data)) @history)
+     	      actions (into [] (comp (remove is-utterance?) (map :data)) @history)
+	      payload {:actions actions :dialog dialog}]
 	(->> payload
 	(clj->js)
 	(.stringify js/JSON))))
 
 (defn send-update! []
- (let [encoded-state (encode-game-state)]
+ (let [encoded-state (encoded-game-state)]
   (.log js/console "sending" encoded-state)
   (.emit socket "update-game" encoded-state)))
 
 (defn game []
  (reagent/create-class                 ;; <-- expects a map of functions
-  {:display-name  "my-component"      ;; for more helpful warnings & errors
+  {:display-name  "voxel-game"      ;; for more helpful warnings & errors
   :component-did-mount               ;; the name of a lifecycle function
   (fn [this]
 
    (let [
-    container (.appendChild (util/$ "div#game") (util/createEl "div"))
-	g (game/create {:container container})]
+    ;container (.appendChild (util/$ "div#game") (util/createEl "div"))
+    container (util/$ "div#game")
+	
+;	g (game/create ;{:container container}
+;)
+]
     (game/add-to-dom g container)
     (game/setup! g game-state)
     ;(prn (.playerPosition game))
@@ -54,7 +93,7 @@
   ) ;; your implementation
   :reagent-render        ;; Note:  is not :render
   (fn []           ;; remember to repeat parameters
-   [:div#game])}))
+   [:div#game {:style {:height "100vh"}}])}))
 
 (defn add-random-block []
   (.log js/console (.-createBlock @game-obj))
@@ -69,19 +108,26 @@
                           (reset! state (-> event .-target .-value)))}])
 
 (defn chat-history [utterances]
-		[:ul (for [[i utterance] (map-indexed vector utterances)]
-		^{:key i} [:li utterance])])
+;	[:p (str utterances)]
+	[:ul (for [[i {:keys [src data]}] (map-indexed vector utterances)]
+		^{:key i} [:li [:b (str "<" src ">: ")] (str data)])])
+;)
+
 (defn chat []
-	(let [current-utterance (reagent/atom "")]
-	[:div 
-		[chat-history @prev-utterances]
-		[:div
-			[input-field current-utterance]
-			[:button {:on-click 
-(fn [] 
-(swap! prev-utterances conj (str "<Architect>: " @current-utterance)) 
-(reset! current-utterance "")
-(send-update!))} "send"]]]))
+ (let [current-utterance (reagent/atom "")]
+  (fn []
+   [:div 
+   [chat-history @history]
+   [:div
+   [input-field current-utterance]
+   [:button {
+   :disabled (empty? @current-utterance)
+   :on-click 
+   (fn [] 
+    (swap! history conj {:type :utterance :src "Architect" :data @current-utterance}) 
+    (reset! current-utterance "")
+    (send-update!))} "send"]]])))
+
 
 (defn root []
  [:div.container>div.row
@@ -102,15 +148,24 @@
 (defn decode-game-state [state]
  (as-> state m
   (js->clj m :keywordize-keys true)
-  (:world-state m)
-  (map (fn [[k v]] (vector k (+ v 85))) m)
-  (into {} m)))
+  (:actions m)
+ ; (map (fn [[k v]] (vector k v)) m)
+ ; (into {} m)
+))
 
 (defn socket-receive [data]
 	(.log js/console "ssocket receive new game state" data)
-	(let [new-game-state (merge (decode-game-state data) @game-state)]
-	(.log js/console "socket receive new game state" data new-game-state)
-	(reset! game-state new-game-state)))
+	(.log js/console "ssocket receive new game state, decoded" (decode-game-state data))
+	(let [new-actions (map (fn [data] {:type :action :src "Builder" :data data}) data)]
+	(doseq [[coord color pickup-or-putdown] (decode-game-state data)]
+		(case pickup-or-putdown 
+		"putdown" (add-block-to-game! g "Builder" coord color)
+		"pickup" (remove-block-from-game! g "Builder" coord)
+		(.log js/console (str "no action for \"" pickup-or-putdown "\""))))
+	;(swap! history concat new-actions)
+	;(let [new-game-state (merge (decode-game-state data) @game-state)]
+	;(reset! game-state new-game-state)))
+))
 
 (defn init []
   (js/console.log "init")

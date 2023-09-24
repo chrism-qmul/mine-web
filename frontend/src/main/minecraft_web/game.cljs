@@ -11,6 +11,25 @@
 (def $ #(.querySelector js/document %))
 (def createEl #(.createElement js/document %))
 
+(def idx->color ["blue" "yellow" "green" "orange" "purple" "red"])
+
+(def color->idx (into {} (map-indexed #(vector %2 %1) idx->color)))
+
+(defn decode-color [color]
+ (-> color
+  (- 86)
+  (idx->color)))
+
+(defn encode-color [color]
+ (-> color
+  (color->idx)
+  (+ 86)))
+
+(defn decode-coord [[x y z]]
+	(vector x (- y 63) z))
+
+(defn encode-coord [[x y z]]
+	(vector x (+ 63 y) z))
 
 (def TEXTURE_PATH "https://cdn.jsdelivr.net/gh/snyxan/myWorld@main/textures/")
 
@@ -133,14 +152,6 @@
   [-9 62 -1] 84
   [-9 62 -2] 85})
 
-(def key-code->block-type {
-1 86
-2 87
-3 88
-4 89
-5 90
-6 91})
-
 (defn inside-floor? [[x _ z]] 
 	(and (<= -5 x 5) (<= -5 z 5)))
 
@@ -190,17 +201,17 @@
 (defn listen-world-change [game state]
  (comment 
 (.on game "setBlock" (fn [pos new-val old-val]
-	(let [pos (js->clj pos)]
+	(let [pos (decode-coord (js->clj pos))]
 	(if (zero? new-val)
 		;(do 
 		;(.log js/console "remove" (type (js->clj pos)) pos)
 		(swap! state dissoc pos)
 		;(do 
 		;(.log js/console "add" (type (js->clj pos)) pos)
-		(swap! state assoc pos new-val))
+		(swap! state assoc (pos (decode-color new-val)))
 ;	(.log js/console "world change" @state ":" pos new-val old-val)
 )))
-)
+))
  (prn "adding state track")
 ;(defonce logger (r/track! log-app-state))
  (add-watch state :track 
@@ -210,8 +221,8 @@
 		;(.log js/console "old-state: " old-state "new-state: " new-state)
 		(.log js/console "for-removal: " (str for-removal) "for-addition: " (str for-addition))
 		
-		(doseq [[pos v] for-removal] (do (prn "removing" pos) (.setBlock game (clj->js pos) 0)))
-		(doseq [[pos v] for-addition] (do (prn "adding" pos v)(.setBlock game (clj->js pos) v)))
+		(doseq [[pos v] for-removal] (do (prn "removing" pos) (.setBlock game (clj->js (encode-coord pos)) 0)))
+		(doseq [[pos v] for-addition] (do (prn "adding" pos v)(.setBlock game (clj->js (encode-coord pos)) (encode-color v))))
 		))))
 
 (defn apply-differences-to-game! [game old-state new-state]
@@ -237,35 +248,40 @@
 	(< y 63))
 
 (defn remove-block! [game position]
-    (when-not (is-scenery? position)
-	(.setBlock game position 0)))
+ (let [encoded-position (encode-coord position)]
+    (when-not (is-scenery? encoded-position)
+	(.setBlock game encoded-position 0))))
 
 (defn add-block! [game position block-type]
-    (when (inside-floor? position)
-	(.log js/console position block-type)
-        (.createBlock game position block-type)))
+ (let [encoded-position (encode-coord position)]
+  (when (inside-floor? encoded-position)
+   (.log js/console encoded-position (encode-color block-type))
+   (.setBlock game (clj->js encoded-position) (encode-color block-type)))))
+
+(defn raycast-adjacent [game]
+ (some-> game
+  (.raycastVoxels)
+  (.-adjacent)
+  (decode-coord)))
 
 (defn add-block-at-pointer! [game block-type] 
-    (let [position (.-adjacent (.raycastVoxels game))]
+    (let [position (raycast-adjacent game)]
         (add-block! game position block-type)))
 
 (defn add-to-dom [game el]
-	(.appendTo game el))
+ (set! (.-container game) el)
+ (.setDimensions game #js{:container el})
+ (.onWindowResize game)
+(.appendTo game el))
 
 (defn setup-interaction! [game]
- (util/on-keypress (fn [ev] 
-	       (when-let [block-type (->> ev 
-				      (.-key) 
-				      (js/parseInt) 
-				      (get key-code->block-type))] 
-		(add-block-at-pointer! game block-type))))
  (.on game "fire" (fn [target state] 
 		   (let [position (.-voxel (.raycastVoxels game))]
 		     (remove-block! game position)))))
 
 (defn setup! [game state]
  (setup-highlight! game)
- (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86))
+ (comment (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86)))
  (setup-interaction! game)
  (setup-player! game)
 (listen-world-change game state)
