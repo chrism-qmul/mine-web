@@ -4,5 +4,5 @@
 
 (def createEl #(.createElement js/document %))
 
-(defn on-keypress [listener]
-	(.addEventListener js/window "keydown" (fn [ev] (listener ev)) false))
+(defn on-keypress [el listener]
+	(.addEventListener el "keydown" (fn [ev] (listener ev)) false))

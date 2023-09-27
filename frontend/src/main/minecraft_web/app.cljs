@@ -15,11 +15,14 @@
 5 "purple";90
 6 "red";91
 })
+
    
 
 (def socket (io-client/io.))
 
 (def g (game/create))
+
+;(.. g -controls target -avatar -position toArray)
 
 ;(game/add-block! g [1 1 1] "blue")
 
@@ -35,7 +38,8 @@
 (def game-obj (atom nil))
 (def game-state (atom nil))
 (def history (reagent/atom []))
-(def prev-utterances (reagent/atom []))
+(def current-model (reagent/atom nil))
+;(def prev-utterances (reagent/atom []))
 
 (defn add-block-to-game! [g party position block-type]
 	(swap! history conj {:type :action :src party :data [position block-type "putdown"]})
@@ -44,14 +48,6 @@
 (defn remove-block-from-game! [g party position]
 	(swap! history conj {:type :action :src party :data [position "pickup"]})
 	(game/remove-block! g position))
-
-(util/on-keypress (fn [ev] 
-	       (when-let [block-type (->> ev 
-				      (.-key) 
-				      (js/parseInt) 
-				      (get key-code->block-type))] 
-		(when-let [position (game/raycast-adjacent g)]
-		(add-block-to-game! g "Architect" position block-type)))))
 
 ;(.. g -opts)
 ;(.. g -opts -container)
@@ -62,7 +58,7 @@
 (defn encoded-game-state []
 	(let [dialog (into [] (comp (filter is-utterance?) (map :data)) @history)
      	      actions (into [] (comp (remove is-utterance?) (map :data)) @history)
-	      payload {:actions actions :dialog dialog}]
+	      payload {:actions actions :dialog dialog :model @current-model}]
 	(->> payload
 	(clj->js)
 	(.stringify js/JSON))))
@@ -75,6 +71,11 @@
 (defn game []
  (reagent/create-class                 ;; <-- expects a map of functions
   {:display-name  "voxel-game"      ;; for more helpful warnings & errors
+  :component-will-unmount
+	(fn [this] 
+(.destroy g)
+;(.remove (util/$ "#stats"))
+)
   :component-did-mount               ;; the name of a lifecycle function
   (fn [this]
 
@@ -87,6 +88,14 @@
 ]
     (game/add-to-dom g container)
     (game/setup! g game-state)
+
+(util/on-keypress js/window (fn [ev] 
+	       (when-let [block-type (->> ev 
+				      (.-key) 
+				      (js/parseInt) 
+				      (get key-code->block-type))] 
+		(when-let [position (game/raycast-adjacent g)]
+		(add-block-to-game! g "Architect" position block-type)))))
     ;(prn (.playerPosition game))
     (reset! game-obj g)
    )
@@ -113,8 +122,18 @@
 		^{:key i} [:li [:b (str "<" src ">: ")] (str data)])])
 ;)
 
+(defn select [properties values]
+[:select properties 
+ (for [[k v] values]
+  ^{:key k} [:option {:value k} v])])
+
+(def models 
+{:collaborative "Collaborative" 
+:learn_to_ask "LearnToAsk"})
+
 (defn chat []
- (let [current-utterance (reagent/atom "")]
+ (let [current-utterance (reagent/atom "")
+       ]
   (fn []
    [:div 
    [chat-history @history]
@@ -126,7 +145,11 @@
    (fn [] 
     (swap! history conj {:type :utterance :src "Architect" :data @current-utterance}) 
     (reset! current-utterance "")
-    (send-update!))} "send"]]])))
+    (send-update!))} "send"]
+   [select {:name :model 
+            :ref (fn [el] (when (some? el) (reset! current-model (. el -value)))) 
+            :on-change (fn [ev] (reset! current-model (.. ev -target -value)))} models]
+	]])))
 
 
 (defn root []

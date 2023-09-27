@@ -15,8 +15,10 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./server/:/app
+    #command: ["celery", "--broker=redis://wordclicker.com:6379/0", "inspect", "active"]
   http:
     image: nginx
     restart: unless-stopped
