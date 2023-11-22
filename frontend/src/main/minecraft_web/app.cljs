@@ -175,7 +175,7 @@
 (defn decode-game-state [state]
  (as-> state m
   (js->clj m :keywordize-keys true)
-  (:actions m)
+  ;(:actions m)
  ; (map (fn [[k v]] (vector k v)) m)
  ; (into {} m)
 ))
@@ -183,16 +183,20 @@
 (defn socket-receive [data]
 	(.log js/console "ssocket receive new game state" data)
 	(.log js/console "ssocket receive new game state, decoded" (decode-game-state data))
-	(let [new-actions (map (fn [data] {:type :action :src "Builder" :data data}) data)]
-	(doseq [[coord color pickup-or-putdown] (decode-game-state data)]
+	(let [{:keys [actions question confidence]} (decode-game-state data)]
+;[new-actions (map (fn [data] {:type :action :src "Builder" :data data}) data)]
+	(doseq [[coord color pickup-or-putdown] actions]
 		(case pickup-or-putdown 
 		"putdown" (add-block-to-game! g "Builder" coord color)
 		"pickup" (remove-block-from-game! g "Builder" coord)
 		(.log js/console (str "no action for \"" pickup-or-putdown "\""))))
+	(when-not (empty? question)
+	    (swap! history conj {:type :utterance :src "Builder" :data question})) 
+		)
 	;(swap! history concat new-actions)
 	;(let [new-game-state (merge (decode-game-state data) @game-state)]
 	;(reset! game-state new-game-state)))
-))
+)
 
 (defn init []
   (js/console.log "init")

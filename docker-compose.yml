@@ -9,6 +9,9 @@ services:
     command: ["npx", "shadow-cljs", "watch", "app"]
     ports:
       - 9000:9000 #nrepl
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
   server:
     build: ./server
     restart: unless-stopped
@@ -18,7 +21,10 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./server/:/app
+      - ./data/:/data
     #command: ["celery", "--broker=redis://wordclicker.com:6379/0", "inspect", "active"]
+    depends_on:
+      - redis
   http:
     image: nginx
     restart: unless-stopped
