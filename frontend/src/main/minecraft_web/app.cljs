@@ -118,8 +118,11 @@
 
 (defn chat-history [utterances]
 ;	[:p (str utterances)]
-	[:ul (for [[i {:keys [src data]}] (map-indexed vector utterances)]
-		^{:key i} [:li [:b (str "<" src ">: ")] (str data)])])
+	[:ul.chat (for [[i {:keys [src data]}] (map-indexed vector utterances)
+:let [party (if (= src "Architect") "sent" "rcvd")]]
+		^{:key i} [:li.msg {:class [party]} 
+;[:b (str "<" src ">: ")] 
+(str data)])])
 ;)
 
 (defn select [properties values]
@@ -135,9 +138,11 @@
  (let [current-utterance (reagent/atom "")
        ]
   (fn []
-   [:div 
-   [chat-history @history]
-   [:div
+   [:div {:style {:display "flex" :height "100vh" :flex-direction "column"}}
+   [:h1 {:style {:flex "0 1 auto"}} "Chat"]
+   [:div {:style {:flex "1 1 auto" :overflow "auto"}}
+   [chat-history @history]]
+   [:div {:style {:flex "0 1 auto"}}
    [input-field current-utterance]
    [:button {
    :disabled (empty? @current-utterance)
@@ -146,16 +151,15 @@
     (swap! history conj {:type :utterance :src "Architect" :data @current-utterance}) 
     (reset! current-utterance "")
     (send-update!))} "send"]
-   [select {:name :model 
-            :ref (fn [el] (when (some? el) (reset! current-model (. el -value)))) 
-            :on-change (fn [ev] (reset! current-model (.. ev -target -value)))} models]
+   ;[select {:name :model 
+   ;         :ref (fn [el] (when (some? el) (reset! current-model (. el -value)))) 
+   ;         :on-change (fn [ev] (reset! current-model (.. ev -target -value)))} models]
 	]])))
 
 
 (defn root []
  [:div.container>div.row
-	[:div.col-sm-3
-		[:h1 "Chat"]
+	[:div.col-sm-3 {:style {:height "100vh"}}
 		[chat]]
 	[:div.col-sm-9
 		[game]]

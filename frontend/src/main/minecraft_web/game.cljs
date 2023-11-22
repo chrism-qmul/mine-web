@@ -155,6 +155,19 @@
 (defn inside-floor? [[x _ z]] 
 	(and (<= -5 x 5) (<= -5 z 5)))
 
+(defn raycast [game]
+	(when-let [result (.raycastVoxels game)]
+	   (let [position (-> result (.-voxel) (decode-coord))
+		color (-> result (.-value) (decode-color))]
+		{:position position
+		:color color})))
+
+(defn raycast-adjacent [game]
+ (some-> game
+  (.raycastVoxels)
+  (.-adjacent)
+  (decode-coord)))
+
 (defn generate-basic-map [x y z] 
   (let [map-coord (get map-coords [x y z])
 	too-high? (>= y 63)
@@ -192,8 +205,10 @@
 (defn setup-player! [game]
  (let [player ((voxel-player game) SPEAKER_SKIN_PATH)]
   (.possess player)
-  ((.. player -yaw -position -set) 2 14 4)
-  (.set player.position 0 63 0)
+  (.set player.position 0 63 8)
+  ;((.. player -yaw -position -set) 0 0 0)
+  ;(.set player.rotation 0.5 -0.6 0.5)
+  (.log js/console "player-position" player.rotation)
   ;(.toggle player)
   (.startFlying ((voxel-fly game) (get-target game)))
   (.control game player)))
@@ -250,19 +265,17 @@
 (defn remove-block! [game position]
  (let [encoded-position (encode-coord position)]
     (when-not (is-scenery? encoded-position)
-	(.setBlock game encoded-position 0))))
+	(.setBlock game (clj->js encoded-position) 0))))
+
+(defn remove-block-at-pointer! [game]
+    (when-let [res (raycast game)]
+        (remove-block! game (:position res))))
 
 (defn add-block! [game position block-type]
  (let [encoded-position (encode-coord position)]
   (when (inside-floor? encoded-position)
    (.log js/console encoded-position (encode-color block-type))
    (.setBlock game (clj->js encoded-position) (encode-color block-type)))))
-
-(defn raycast-adjacent [game]
- (some-> game
-  (.raycastVoxels)
-  (.-adjacent)
-  (decode-coord)))
 
 (defn add-block-at-pointer! [game block-type] 
     (let [position (raycast-adjacent game)]
@@ -274,16 +287,15 @@
  (.onWindowResize game)
 (.appendTo game el))
 
-(defn setup-interaction! [game]
- (.on game "fire" (fn [target state] 
-		   (let [position (.-voxel (.raycastVoxels game))]
-		     (remove-block! game position)))))
+;(defn setup-interaction! [game]
+; (.on game "fire" (fn [target state] 
+;		     (remove-block-at-pointer! game))))
 
 (defn setup! [game state]
  (setup-highlight! game)
  (comment (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86)))
- (setup-interaction! game)
+ ;(setup-interaction! game)
  (setup-player! game)
 (listen-world-change game state)
-; (setup-player-walking-animation! game)
+ (setup-player-walking-animation! game)
 )
