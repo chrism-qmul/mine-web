@@ -205,7 +205,7 @@
 (defn setup-player! [game]
  (let [player ((voxel-player game) SPEAKER_SKIN_PATH)]
   (.possess player)
-  (.set player.position 0 63 8)
+  (.set player.position 0 63 0)
   ;((.. player -yaw -position -set) 0 0 0)
   ;(.set player.rotation 0.5 -0.6 0.5)
   (.log js/console "player-position" player.rotation)
@@ -293,8 +293,8 @@
 
 (defn setup! [game state]
  (setup-highlight! game)
- (comment (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86)))
- ;(setup-interaction! game)
+ ;(comment (prn "creating block" (.canCreateBlock game (clj->js [-5 63 -5])) (.createBlock game (clj->js [-2 63 -2]) 86)))
+;(setup-interaction! game)
  (setup-player! game)
 (listen-world-change game state)
  (setup-player-walking-animation! game)

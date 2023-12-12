@@ -37,16 +37,19 @@
 (def connected (atom false))
 (def game-obj (atom nil))
 (def game-state (atom nil))
+(def world-state (atom nil))
 (def history (reagent/atom []))
 (def current-model (reagent/atom nil))
 ;(def prev-utterances (reagent/atom []))
 
 (defn add-block-to-game! [g party position block-type]
-	(swap! history conj {:type :action :src party :data [position block-type "putdown"]})
+	(swap! world-state assoc position block-type)
+	;(swap! history conj {:type :action :src party :data [position block-type "putdown"]})
 	(game/add-block! g position block-type))
 
 (defn remove-block-from-game! [g party position]
-	(swap! history conj {:type :action :src party :data [position "pickup"]})
+	(swap! world-state dissoc position)
+	;(swap! history conj {:type :action :src party :data [position "pickup"]})
 	(game/remove-block! g position))
 
 ;(.. g -opts)
@@ -56,9 +59,9 @@
 	(= :utterance (h :type)))
 
 (defn encoded-game-state []
-	(let [dialog (into [] (comp (filter is-utterance?) (map :data)) @history)
-     	      actions (into [] (comp (remove is-utterance?) (map :data)) @history)
-	      payload {:actions actions :dialog dialog :model @current-model}]
+	(let [dialog (last (into [] (comp (filter is-utterance?) (map :data)) @history))
+     	      world-state (str (into [] (for [[k v] @world-state] (conj k v))))
+	      payload {:world world-state :dialog dialog}]
 	(->> payload
 	(clj->js)
 	(.stringify js/JSON))))
@@ -90,12 +93,13 @@
     (game/setup! g game-state)
 
 (util/on-keypress js/window (fn [ev] 
-	       (when-let [block-type (->> ev 
-				      (.-key) 
-				      (js/parseInt) 
-				      (get key-code->block-type))] 
-		(when-let [position (game/raycast-adjacent g)]
-		(add-block-to-game! g "Architect" position block-type)))))
+	(let [number-pressed (->> ev (.-key) (js/parseInt))]
+		(if (zero? number-pressed)
+			 (when-let [{:keys [position]} (game/raycast g)]
+				(remove-block-from-game! g "Architect" position)) 
+	       		(when-let [block-type (get key-code->block-type number-pressed)] 
+				(when-let [position (game/raycast-adjacent g)]
+					(add-block-to-game! g "Architect" position block-type)))))))
     ;(prn (.playerPosition game))
     (reset! game-obj g)
    )
@@ -134,6 +138,15 @@
 {:collaborative "Collaborative" 
 :learn_to_ask "LearnToAsk"})
 
+(defn legend []
+	[:div.legend
+		[:b "Controls: "]
+	(doall (for [[k color] key-code->block-type]
+		[:span {:style {:color color}} (str k)]))
+		"("
+		[:span {:style {:color "white"}} "0"]
+		" removes)"])
+
 (defn chat []
  (let [current-utterance (reagent/atom "")
        ]
@@ -162,6 +175,7 @@
 	[:div.col-sm-3 {:style {:height "100vh"}}
 		[chat]]
 	[:div.col-sm-9
+		[legend]
 		[game]]
 	])
 
@@ -183,15 +197,10 @@
 (defn socket-receive [data]
 	(.log js/console "ssocket receive new game state" data)
 	(.log js/console "ssocket receive new game state, decoded" (decode-game-state data))
-	(let [{:keys [actions question confidence]} (decode-game-state data)]
+	(let [{:keys [instruction]} (decode-game-state data)]
 ;[new-actions (map (fn [data] {:type :action :src "Builder" :data data}) data)]
-	(doseq [[coord color pickup-or-putdown] actions]
-		(case pickup-or-putdown 
-		"putdown" (add-block-to-game! g "Builder" coord color)
-		"pickup" (remove-block-from-game! g "Builder" coord)
-		(.log js/console (str "no action for \"" pickup-or-putdown "\""))))
-	(when-not (empty? question)
-	    (swap! history conj {:type :utterance :src "Builder" :data question})) 
+	(when-not (empty? instruction)
+	    (swap! history conj {:type :utterance :src "Builder" :data instruction})) 
 		)
 	;(swap! history concat new-actions)
 	;(let [new-game-state (merge (decode-game-state data) @game-state)]

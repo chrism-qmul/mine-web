@@ -57,32 +57,19 @@ def handle_json(message):
     from chatgpt import MinecraftGPT
     message = json.loads(message)
     agent = MinecraftGPT.fromEncoded(session['agent']) if session['agent'] else MinecraftGPT()
-    agent_reply = agent.ask(message['dialog'][-1])
+    to_send = f"updated world state: {message['world']}; builder says: {message['dialog']}"
+    agent_reply = agent.ask(message=to_send)
     session['agent'] = agent.encode()
     with open(f"/data/{session['uuid']}.txt", "a+") as fh:
-        fh.write(message['dialog'][-1] + "\n")
+        fh.write(to_send)
         fh.write(json.dumps(agent_reply) + "\n")
-    #print("dialog", message['dialog'])
-    #new_world = chatgpt.minecraft(message['dialog'])
-    #world_state = [(tuple(world), color, "putdown") for world, color in message['world-state']]
     print("new_world", agent_reply)
-    #ymin = 0
-    #if new_world:
-    #    ymin = abs(min(0, *[y for x, y, z, color in new_world]))
-    add = []
-    remove = []
-    try:
-        add = [[[x,y,z], color, "putdown"] for x, y, z, color in agent_reply.get("add")]
-        remove = [[[x,y,z], color, "pickup"] for x, y, z, color in agent_reply.get("remove")]
-    except:
-        pass
-    actions = add + remove
     #world_state = [((x,y+ymin,z), color, "putdown" if action=="add" else "pickup") for x, y, z, color, action in new_world]
 #    app.logger.info('[input] world:state' + str(world_state) + "; dialog: " + str(message['dialog']))
 #    result = sample(message['dialog'], world_state, message['model'])
     #app.logger.info('result: ' + str(result))
     #emit("update-game", {'world-state': [[[1,63,1],86],[[4,63,4],86],[[3,63,3],86]]})
-    emit("update-game", {'confidence': agent_reply.get('confidence', 1.0), 'actions': actions, 'question': agent_reply.get("question","")})
+    emit("update-game", {'instruction': agent_reply})
 
 #@socketio.on('update-game')
 #def handle_json(message):

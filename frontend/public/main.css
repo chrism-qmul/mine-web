@@ -1,5 +1,15 @@
 * {margin: 0; box-sizing: border-box;}
 
+.legend {
+padding-left:2em;
+position:absolute;
+font-size:2em;
+}
+
+.legend span {
+text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+}
+
 .chat {
   --rad: 20px;
   --rad-sm: 3px;
