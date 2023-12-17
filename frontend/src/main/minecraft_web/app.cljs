@@ -17,6 +17,9 @@
 })
 
    
+(defn window-hash []
+	(when-let [v (.. js/window -location -hash)]
+		 (subs v 1)))
 
 (def socket (io-client/io.))
 
@@ -29,6 +32,12 @@
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
 
+
+(defn json-parse [json-str]
+	(->> json-str
+		(.parse js/JSON)
+		(js->clj)))
+
 (try
 	(.parse js/JSON "[1]")
 	(catch js/Error e
@@ -37,7 +46,9 @@
 (def connected (atom false))
 (def game-obj (atom nil))
 (def game-state (atom nil))
+(def target-world-state-shown? (atom false))
 (def world-state (atom nil))
+(def target-world-state (atom nil))
 (def history (reagent/atom []))
 (def current-model (reagent/atom nil))
 ;(def prev-utterances (reagent/atom []))
@@ -46,6 +57,14 @@
 	(swap! world-state assoc position block-type)
 	;(swap! history conj {:type :action :src party :data [position block-type "putdown"]})
 	(game/add-block! g position block-type))
+
+(defn add-blocks-to-game! [g blocks]
+ (doseq [[[x y z] color] blocks]
+  (game/add-block! g [x y z] color)))
+
+(defn remove-blocks-from-game! [g blocks]
+ (doseq [[[x y z] _] blocks]
+  (game/remove-block! g [x y z])))
 
 (defn remove-block-from-game! [g party position]
 	(swap! world-state dissoc position)
@@ -65,6 +84,11 @@
 	(->> payload
 	(clj->js)
 	(.stringify js/JSON))))
+
+(defn socket-send [channel data]
+	(.emit socket channel (->> data
+		(clj->js)
+		(.stringify js/JSON))))
 
 (defn send-update! []
  (let [encoded-state (encoded-game-state)]
@@ -92,14 +116,31 @@
     (game/add-to-dom g container)
     (game/setup! g game-state)
 
+(defn toggle-world-state-shown [g]
+	(swap! target-world-state-shown? not)
+	(if @target-world-state-shown? 
+		(do 
+			(prn @world-state "->" @target-world-state)
+			(remove-blocks-from-game! g @world-state)
+			(add-blocks-to-game! g @target-world-state))
+		(do 
+			(prn @target-world-state "->" @world-state)
+			(remove-blocks-from-game! g @target-world-state)
+			(add-blocks-to-game! g @world-state))))
+
 (util/on-keypress js/window (fn [ev] 
-	(let [number-pressed (->> ev (.-key) (js/parseInt))]
-		(if (zero? number-pressed)
-			 (when-let [{:keys [position]} (game/raycast g)]
-				(remove-block-from-game! g "Architect" position)) 
-	       		(when-let [block-type (get key-code->block-type number-pressed)] 
-				(when-let [position (game/raycast-adjacent g)]
-					(add-block-to-game! g "Architect" position block-type)))))))
+	(let [pressed-key (.-key ev)]
+			     (if (= (str pressed-key) "Tab")
+			      (do
+				      (.log js/console "switch to dev display")
+					(toggle-world-state-shown g))
+			      (let [number-pressed (js/parseInt pressed-key)]
+			       (if (zero? number-pressed)
+				(when-let [{:keys [position]} (game/raycast g)]
+				 (remove-block-from-game! g "Architect" position)) 
+				(when-let [block-type (get key-code->block-type number-pressed)] 
+				 (when-let [position (game/raycast-adjacent g)]
+				  (add-block-to-game! g "Architect" position block-type)))))))))
     ;(prn (.playerPosition game))
     (reset! game-obj g)
    )
@@ -194,10 +235,19 @@
  ; (into {} m)
 ))
 
-(defn socket-receive [data]
+
+(defmulti socket-receive :type)
+
+(defmethod socket-receive :default [data]
+	(.warn js/console "received data with no registered handler: " data))
+
+(defmethod socket-receive "target" [{:keys [target_data]}]
+	;(reset! target-world-state [[x y z] color] (for [[x y z color] (json-parse target_data)] (vector )))
+	(reset! target-world-state (into {} (map (fn [coll] (vector (vec (take 3 coll)) (last coll))) (json-parse target_data)))))
+
+(defmethod socket-receive "instruction" [data]
 	(.log js/console "ssocket receive new game state" data)
-	(.log js/console "ssocket receive new game state, decoded" (decode-game-state data))
-	(let [{:keys [instruction]} (decode-game-state data)]
+	(let [{:keys [instruction]} data]
 ;[new-actions (map (fn [data] {:type :action :src "Builder" :data data}) data)]
 	(when-not (empty? instruction)
 	    (swap! history conj {:type :utterance :src "Builder" :data instruction})) 
@@ -210,10 +260,12 @@
 (defn init []
   (js/console.log "init")
   (let []
-	(.on socket "update-game" socket-receive)
+	(.on socket "update-game" (fn [data] (socket-receive (js->clj data :keywordize-keys true))))
 	(.on socket "disconnect" #(reset! connected false))
 	(.on socket "connect"
 		(fn [] 
+		  (when-not (empty? (window-hash))
+		  (socket-send "select-target" {:target (window-hash)}))
 			(reset! connected true)
 			(.log js/console "connected!")
 			))

@@ -274,7 +274,7 @@
 (defn add-block! [game position block-type]
  (let [encoded-position (encode-coord position)]
   (when (inside-floor? encoded-position)
-   (.log js/console encoded-position (encode-color block-type))
+   ;(.log js/console encoded-position (encode-color block-type))
    (.setBlock game (clj->js encoded-position) (encode-color block-type)))))
 
 (defn add-block-at-pointer! [game block-type] 

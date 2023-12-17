@@ -30,6 +30,23 @@ s = Session()
 s.init_app(app)
 socketio = SocketIO(app)
 
+targets = {}
+
+required_dirs = ["/data/logs", "/data/targets"]
+
+
+for required_dir in required_dirs:
+    if not os.path.exists(required_dir):
+        os.mkdir(required_dir)
+
+for root, dirs, files in os.walk("/data/targets", topdown=False):
+    for name in files:
+        if name.endswith(".json"):
+            target_path = os.path.join(root, name)
+            with open(target_path, "r") as fh:
+                print(f"Loading targets from: {target_path}")
+                targets.update(json.load(fh))
+
 task_routes = {
     'tasks.learn_to_ask': 'learn_to_ask',
     'tasks.collaborative': 'collaborative',
@@ -51,25 +68,38 @@ def random_blocks():
     rand_color = lambda: random.randint(1, 6)
     return [[[rand_coord(), 1, rand_coord()], rand_color()] for _ in range(3)]
 
+@socketio.on('select-target')
+def handle_json_target(message):
+    #import chatgpt
+    from chatgpt import MinecraftGPT
+    print("select-target", message)
+    message = json.loads(message)
+    agent = MinecraftGPT(target=message['target'], targets=targets)
+    session['agent'] = agent.encode()
+    print(f"selecting target {message['target']}")
+    with open(f"/data/logs/{session['uuid']}.txt", "a+") as fh:
+        fh.write(f"target:{agent.target}\n")
+    emit("update-game", {'type':'target', 'target': agent.target, 'target_data': agent.target_data()})
+
 @socketio.on('update-game')
-def handle_json(message):
+def handle_json_update(message):
     #import chatgpt
     from chatgpt import MinecraftGPT
     message = json.loads(message)
-    agent = MinecraftGPT.fromEncoded(session['agent']) if session['agent'] else MinecraftGPT()
+    print("session_agent", session['agent'])
+    if session['agent']:
+        agent = MinecraftGPT.fromEncoded(session['agent'], targets=targets)
+    else:
+        agent = MinecraftGPT(targets=targets)
+        emit("update-game", {'type':'target', 'target': agent.target, 'target_data': agent.target_data()})
     to_send = f"updated world state: {message['world']}; builder says: {message['dialog']}"
     agent_reply = agent.ask(message=to_send)
     session['agent'] = agent.encode()
-    with open(f"/data/{session['uuid']}.txt", "a+") as fh:
+    with open(f"/data/logs/{session['uuid']}.txt", "a+") as fh:
         fh.write(to_send)
         fh.write(json.dumps(agent_reply) + "\n")
     print("new_world", agent_reply)
-    #world_state = [((x,y+ymin,z), color, "putdown" if action=="add" else "pickup") for x, y, z, color, action in new_world]
-#    app.logger.info('[input] world:state' + str(world_state) + "; dialog: " + str(message['dialog']))
-#    result = sample(message['dialog'], world_state, message['model'])
-    #app.logger.info('result: ' + str(result))
-    #emit("update-game", {'world-state': [[[1,63,1],86],[[4,63,4],86],[[3,63,3],86]]})
-    emit("update-game", {'instruction': agent_reply})
+    emit("update-game", {'type':'instruction', 'instruction': agent_reply})
 
 #@socketio.on('update-game')
 #def handle_json(message):
